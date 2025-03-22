@@ -24,6 +24,11 @@
  %%
  "+"         { print_token("ADD"); }
  "-"         { print_token("SUB"); }
+ "("         { print_token("LPAREN"); }
+ ")"         { print_token("RPAREN"); }
+ "{"         { print_token("LBRACE"); }
+ "}"         { print_token("RBRACE"); }
+ ":"         { print_token("SEMICOLON"); }
  <<EOF>>     { line_num++; yyterminate(); }
  [ \t]+      {;}
  .           {;}
