@@ -24,6 +24,7 @@
  %%
  "+"         { print_token("ADD"); }
  "-"         { print_token("SUB"); }
+ """         { print_token("QUOTA"); }
  "("         { print_token("LPAREN"); }
  ")"         { print_token("RPAREN"); }
  <<EOF>>     { line_num++; yyterminate(); }
