@@ -24,6 +24,7 @@
  %%
  "+"         { print_token("ADD"); }
  "-"         { print_token("SUB"); }
+ "("         { print_token("LPAREN"); }
  <<EOF>>     { line_num++; yyterminate(); }
  [ \t]+      {;}
  .           {;}
