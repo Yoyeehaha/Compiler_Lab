@@ -18,17 +18,46 @@
 /* Define regular expression label */
 letter [a-zA-Z_]
 digit [0-9]
+func fn\ {letter}
+ident {letter}({letter}|{digit})*
+str_lit {letter}*
+int_num {digit}+
+float_num {digit}+.{digit}+
 
+/* Define state */
+%x SIG_COM
+%x MUL_COM
+%x STRING
 
 /* Rules section */
 %%
+
 "+"         { print_token("ADD"); }
 "-"         { print_token("SUB"); }
 "("         { print_token("LPAREN"); }
 ")"         { print_token("RPAREN"); }
 "{"         { print_token("LBRACE"); }
 "}"         { print_token("RBRACE"); }
-":"         { print_token("SEMICOLON"); }
+";"         { print_token("SEMICOLON"); }
+
+"/*"        { BEGIN(MUL_COM); }
+<MUL_COM>"*/" { print_token("MUTI_LINE_COMMENT"); BEGIN(INITIAL); }
+<MUL_COM>"\n"  { comment_num++; line_num++; }
+<MUL_COM>([^\n]) { yymore(); }
+
+"//"        {BEGIN(SIG_COM); }
+<SIG_COM>"\n" {  print_token("COMMENT"); print_token("NEWLINE"); BEGIN(INITIAL); comment_num++; line_num++;}
+<SIG_COM>([^\n]) { yymore(); }
+
+"\""        { print_token("QUOTA"); BEGIN(STRING); }
+<STRING>"\"" {  print_token("QUOTA"); BEGIN(INITIAL); }
+<STRING>([^\"]) {print_token("STRING_LIT"); yymore(); }
+
+"\n"        { print_token("NEWLINE"); line_num++; }
+"str_lit"   { print_token("STRING_LIT"); }
+"println"   { print_token("PRINTLN"); }
+{func}      { yyless(3); print_token("FUNC"); }
+{ident}     { print_token("IDENT"); }
 <<EOF>>     { line_num++; yyterminate(); }
 [ \t]+      {;}
 .           {;}
