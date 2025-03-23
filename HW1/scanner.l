@@ -22,7 +22,9 @@ func fn\ {letter}
 ident {letter}({letter}|{digit})*
 str_lit {letter}*
 int_num {digit}+
+int_val (i){digit}+
 float_num {digit}+.{digit}+
+float_val (f){digit}+
 
 /* Define state */
 %x SIG_COM
@@ -33,29 +35,65 @@ float_num {digit}+.{digit}+
 %%
 
 "+"         { print_token("ADD"); }
+"+="        { print_token("ADD_ASSIGN"); }
 "-"         { print_token("SUB"); }
+"-="        { print_token("SUB_ASSIGN"); }
+"*"         { print_token("MUL"); }
+"*="        { print_token("MUL_ASSIGN"); }
+"/"         { print_token("QUO"); }
+"/="        { print_token("QUO_ASSIGN"); }
+"%"         { print_token("REM"); }
+"%="        { print_token("REM_ASSIGN"); }
+">>"        { print_token("RSHIFT"); }
+"<<"        { print_token("LSHIFT"); }
+"<="        { print_token("LEQ"); }
+">="        { print_token("GEQ"); }
+"=="        { print_token("EQL"); }
+">"         { print_token("GTR"); }
+"<"         { print_token("LSS"); }
+"!"         { print_token("NOT"); }
+"&"         { print_token("AND"); }
+"&&"        { print_token("LAND"); }
+"||"        { print_token("LOR"); }
+
 "("         { print_token("LPAREN"); }
 ")"         { print_token("RPAREN"); }
 "{"         { print_token("LBRACE"); }
 "}"         { print_token("RBRACE"); }
+":"         { print_token("COLON"); }
+"="         { print_token("ASSIGN"); }
 ";"         { print_token("SEMICOLON"); }
 
-"/*"        { BEGIN(MUL_COM); }
+"/*"        { yymore(); BEGIN(MUL_COM); }
 <MUL_COM>"*/" { print_token("MUTI_LINE_COMMENT"); BEGIN(INITIAL); }
-<MUL_COM>"\n"  { comment_num++; line_num++; }
+<MUL_COM>"\n"  { comment_num++; line_num++; printf("%s", yytext); }
 <MUL_COM>([^\n]) { yymore(); }
 
-"//"        {BEGIN(SIG_COM); }
-<SIG_COM>"\n" {  print_token("COMMENT"); print_token("NEWLINE"); BEGIN(INITIAL); comment_num++; line_num++;}
-<SIG_COM>([^\n]) { yymore(); }
+"//"        { yymore(); BEGIN(SIG_COM); }
+<SIG_COM>"\n" { print_token("COMMENT"); print_token("NEWLINE"); comment_num++; line_num++; BEGIN(INITIAL); }
+<SIG_COM>[^\n]* { yymore(); }
 
 "\""        { print_token("QUOTA"); BEGIN(STRING); }
-<STRING>"\"" {  print_token("QUOTA"); BEGIN(INITIAL); }
-<STRING>([^\"]) {print_token("STRING_LIT"); yymore(); }
+<STRING>"\"" { BEGIN(INITIAL); print_token("QUOTA");}
+<STRING>[^\"]* { print_token("STRING_LIT"); }
 
 "\n"        { print_token("NEWLINE"); line_num++; }
-"str_lit"   { print_token("STRING_LIT"); }
+
+"as"        { print_token("AS"); }
+"if"        { print_token("IF"); }
+"else"      { print_token("ELSE"); }
+"while"     { print_token("WHILE"); }
+"let"       { print_token("LET"); }
+"mut"       { print_token("MUT"); }
+"print"     { print_token("PRINT"); }
 "println"   { print_token("PRINTLN"); }
+"bool"      { print_token("BOOL"); }
+"false"     { print_token("FALSE"); }
+"true"      { print_token("TRUE"); }
+{int_num}   { print_token("INT_LIT"); }
+{int_val}   { print_token("INT"); }
+{float_num} { print_token("FLOAT_LIT"); }
+{float_val} { print_token("FLOAT"); }
 {func}      { yyless(3); print_token("FUNC"); }
 {ident}     { print_token("IDENT"); }
 <<EOF>>     { line_num++; yyterminate(); }
