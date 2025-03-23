@@ -52,7 +52,7 @@ float_val (f){digit}+
 ">"         { print_token("GTR"); }
 "<"         { print_token("LSS"); }
 "!"         { print_token("NOT"); }
-"&"         { print_token("AND"); }
+"&"         { print_token("BAND"); }
 "&&"        { print_token("LAND"); }
 "||"        { print_token("LOR"); }
 
@@ -60,6 +60,10 @@ float_val (f){digit}+
 ")"         { print_token("RPAREN"); }
 "{"         { print_token("LBRACE"); }
 "}"         { print_token("RBRACE"); }
+"["         { print_token("LBRACK"); }
+"]"         { print_token("RBRACK"); }
+".."        { print_token("DOTDOT"); }
+","         { print_token("COMMA"); }  
 ":"         { print_token("COLON"); }
 "="         { print_token("ASSIGN"); }
 ";"         { print_token("SEMICOLON"); }
@@ -80,9 +84,13 @@ float_val (f){digit}+
 "\n"        { print_token("NEWLINE"); line_num++; }
 
 "as"        { print_token("AS"); }
+"in"        { print_token("IN"); }
 "if"        { print_token("IF"); }
 "else"      { print_token("ELSE"); }
 "while"     { print_token("WHILE"); }
+"break"     { print_token("BREAK"); }
+"for"       { print_token("FOR"); }
+"loop"      { print_token("LOOP"); }
 "let"       { print_token("LET"); }
 "mut"       { print_token("MUT"); }
 "print"     { print_token("PRINT"); }
