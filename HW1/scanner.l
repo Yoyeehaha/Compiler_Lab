@@ -69,14 +69,16 @@ float_val (f){digit}+
 "="         { print_token("ASSIGN"); }
 ";"         { print_token("SEMICOLON"); }
 
-"/*"        { yymore(); BEGIN(MUL_COM); }
+"/*"        { printf("%s", yytext); BEGIN(MUL_COM); }
 <MUL_COM>"*/" { print_token("MUTI_LINE_COMMENT"); BEGIN(INITIAL); comment_num++; }
 <MUL_COM>"\n"  { comment_num++; line_num++; printf("%s", yytext); }
-<MUL_COM>([^\n]) { yymore(); }
+<MUL_COM>"\r" { ; }
+<MUL_COM>[^\n] { printf("%s", yytext); }
 
-"//"        { yymore(); BEGIN(SIG_COM);}
-<SIG_COM>"\n" { print_token("COMMENT"); BEGIN(INITIAL); print_token("NEWLINE"); comment_num++; line_num++; }
-<SIG_COM>[^\n]* { yymore(); }
+"//"        { printf("%s", yytext); BEGIN(SIG_COM);}
+<SIG_COM>"\n" { BEGIN(INITIAL); print_token("NEWLINE"); comment_num++; line_num++; }
+<SIG_COM>"\r" { ; }
+<SIG_COM>[^\n]* { printf("%s", yytext); print_token("COMMENT"); }
 
 "\""        { print_token("QUOTA"); BEGIN(STRING); }
 <STRING>"\"" { BEGIN(INITIAL); print_token("QUOTA");}
