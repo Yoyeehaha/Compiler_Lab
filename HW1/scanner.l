@@ -20,7 +20,6 @@ letter [a-zA-Z_]
 digit [0-9]
 func fn\ {letter}
 ident {letter}({letter}|{digit})*
-str_lit {letter}*
 int_num {digit}+
 int_val (i){digit}+
 float_num {digit}+.{digit}+
