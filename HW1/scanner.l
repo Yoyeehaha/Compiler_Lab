@@ -70,21 +70,25 @@ float_val (f){digit}+
 ";"         { print_token("SEMICOLON"); }
 
 "/*"        { printf("%s", yytext); BEGIN(MUL_COM); }
-<MUL_COM>"*/" { print_token("MUTI_LINE_COMMENT"); BEGIN(INITIAL); comment_num++; }
+<MUL_COM>"*/" { print_token("MUTI_LINE_COMMENT"); last_comment_line = line_num + 1; BEGIN(INITIAL);}
 <MUL_COM>"\n"  { comment_num++; line_num++; printf("%s", yytext); }
 <MUL_COM>"\r" { ; }
 <MUL_COM>[^\n] { printf("%s", yytext); }
 
-"//"        { printf("%s", yytext); BEGIN(SIG_COM);}
+"//"[^\n|^\r]*       { BEGIN(SIG_COM); print_token("COMMENT"); }
 <SIG_COM>"\n" { BEGIN(INITIAL); print_token("NEWLINE"); comment_num++; line_num++; }
 <SIG_COM>"\r" { ; }
-<SIG_COM>[^\n]* { printf("%s", yytext); print_token("COMMENT"); }
 
 "\""        { print_token("QUOTA"); BEGIN(STRING); }
 <STRING>"\"" { BEGIN(INITIAL); print_token("QUOTA");}
 <STRING>[^\"]* { print_token("STRING_LIT"); }
 
-"\n"        { print_token("NEWLINE"); line_num++; }
+"\n"        { print_token("NEWLINE"); line_num++; 
+                if (last_comment_line == line_num){
+                    comment_num++;
+                    last_comment_line = -1;
+                }
+            }
 
 "as"        { print_token("AS"); }
 "in"        { print_token("IN"); }
