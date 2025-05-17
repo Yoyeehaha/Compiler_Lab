@@ -85,7 +85,18 @@ GlobalStatement
 ;
 
 FunctionDeclStmt
-    : { create_symbol(0); } FUNC { printf("func: main\n") } '(' ')' '{' '}'
+    : { create_symbol(0); } FUNC { printf("func: main\n"); } { insert_symbol(-1, "main", 0); } { create_symbol(1); } '(' ')' '{' TypeList ';' '}'
+;
+
+TypeList
+    :Type 
+;    
+
+Type
+    : INT {$$ = "i32";}
+    | FLOAT {$$ = "f32";}
+    | BOOL {$$ = "bool";}
+    | STR {$$ = "str";}
 ;
 %%
 
