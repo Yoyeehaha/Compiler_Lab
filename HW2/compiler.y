@@ -11,11 +11,13 @@
     extern FILE *yyin;
 
     int yylex_destroy ();
+    int addr = -1, level = 0;
     void yyerror (char const *s)
     {
         printf("error:%d: %s\n", yylineno, s);
     }
 
+    /* Symbol table function - you can add new functions if needed. */
     extern int yylineno;
     extern int yylex();
     extern FILE *yyin;
@@ -85,13 +87,33 @@ GlobalStatement
 ;
 
 FunctionDeclStmt
-    : { create_symbol(0); } FUNC { printf("func: main\n"); } { insert_symbol(-1, "main", 0); } { create_symbol(1); } '(' ')' '{' TypeList ';' '}'
+    : { create_symbol(0); } FUNC { printf("func: main\n"); } ID { insert_symbol(addr, "main", 0); } { addr++; level++;} { create_symbol(1); } '(' ')' '{' Content '}'
+;
+
+Content
+    : PRINTLN '(' '"' STRING_LIT '"' ')' ';' { printf("STRING_LIT"); } { printf(" \""); } { printf("%s", $<s_val>4); } { printf("\"\n"); } { printf("PRINTLN str\n"); } 
+    | PRINTLN '(' ARITHMETIC ')' ';' { printf("PRINTLN %s\n", $<s_val>3); } 
+    | LET ID ':' TypeList ';' { insert_symbol(addr, $<s_val>2, level); } { addr++; } 
+    | Content Content
+;
+
+ARITHMETIC
+    : ID '+' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("ADD\n"); } 
+    | ID '-' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("SUB\n"); }
+    | ID '*' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("MUL\n"); }
+    | ID '/' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("DIV\n"); }
+    | ID '%' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("REM\n"); }
 ;
 
 TypeList
-    : Type { printf("%s\n", $<s_val>1); } IDENT '=' INT_LIT { printf("%d\n", $<i_val>5); }
-    | Type { printf("%s\n", $<s_val>1); } IDENT '=' FLOAT_LIT { printf("%f\n", $<f_val>5); }
-;    
+    : Type '=' Literal
+;  
+
+//Using this to avoid public prefix problem
+Literal 
+    : INT_LIT { printf("INT_LIT "); } { printf("%d\n", $<i_val>1); }
+    | FLOAT_LIT { printf("FLOAT_LIT "); } { printf("%f\n", $<f_val>1); }
+    | STRING_LIT { printf("STRING_LIT "); } { printf("%s\n", $<s_val>1); }
 
 Type
     : INT {$$ = "i32";}
