@@ -12,6 +12,7 @@
 
     int yylex_destroy ();
     int addr = -1, level = 0;
+    static const char* expr_type = "i32";
     void yyerror (char const *s)
     {
         printf("error:%d: %s\n", yylineno, s);
@@ -72,6 +73,7 @@
 %nonassoc EQL NEQ '>' GEQ '<' LEQ
 %left  '+' '-'
 %left  '*' '/' '%'
+%right  NOT_UMINUS //To rise the priority of 'NOT' 
 
 /* Yacc will start at this nonterminal */
 %start Program
@@ -94,7 +96,7 @@ GlobalStatement
 ;
 
 FunctionDeclStmt
-    : { create_symbol(0); } FUNC { printf("func: main\n"); } ID { insert_symbol(addr, "main", 0); } { addr++; level++;} { create_symbol(1); } '(' ')' '{' Content '}'
+    : { create_symbol(0); } FUNC { printf("func: main\n"); } ID { insert_symbol(addr, "main", 0); } { addr++; level++;} { create_symbol(1); } '(' ')' '{' Content '}' { dump_symbol(--level); }
 ;
 
 Content
@@ -103,11 +105,25 @@ Content
 ;
 
 Statement
-    : PRINTLN '(' '"' STRING_LIT '"' ')' ';' { printf("STRING_LIT"); } { printf(" \""); } { printf("%s", $<s_val>4); } { printf("\"\n"); } { printf("PRINTLN str\n"); } 
-    | PRINTLN '(' Expr ')' ';' { printf("PRINTLN not finsh fill what intoit!!!! \n"); } 
-    | PRINT '(' Expr ')' ';' { printf("PRINT not finsh fill what intoit!!!! \n"); } 
-    | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, level); } { addr++; } 
+    : PRINTLN '(' '"' STRING_LIT '"' ')' ';' { printf("STRING_LIT"); } { printf("\"%s\"\n", $<s_val>4); } { printf("PRINTLN str\n"); } 
+    | PRINTLN '(' Expr ')' ';' { printf("PRINTLN %s\n", expr_type); } 
+    | PRINT '(' Expr ')' ';' { printf("PRINT %s\n", expr_type); } 
+    | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, level); } { addr++; }
+    | LET MUT ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>3, level); } { addr++; }
+    | LET MUT ID ':' Type ';' { insert_symbol(addr, $<s_val>3, level); } { addr++; }  
+    | '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
+    | GiveValueStatement ';'
     | NEWLINE
+;
+
+GiveValueStatement
+    : ID '=' Expr          { printf("ASSIGN\n");  }
+    | ID ADD_ASSIGN Expr     { printf("ADD_ASSIGN\n");  }
+    | ID SUB_ASSIGN Expr     { printf("SUB_ASSIGN\n");  }
+    | ID MUL_ASSIGN Expr     { printf("MUL_ASSIGN\n");  }
+    | ID DIV_ASSIGN Expr     { printf("DIV_ASSIGN\n");  }
+    | ID REM_ASSIGN Expr     { printf("REM_ASSIGN\n");  }
+    | Expr
 ;
 
 Expr
@@ -127,7 +143,14 @@ Expr
     | Expr LAND Expr  { printf("LAND\n"); }
     | Expr LOR  Expr  { printf("LOR\n"); }
 
-    | '!' Expr        { printf("NOT\n"); }
+    | Expr AS Type    { if (strcmp(expr_type, "f32") == 0 && strcmp($<s_val>3, "i32") == 0) {
+                            printf("f2i\n"); expr_type = "i32";
+                        } else {
+                            printf("i2f\n"); expr_type = "f32";
+                        }
+                      }
+
+    | '!' Expr  %prec NOT_UMINUS  { printf("NOT\n"); }
     | '-' Expr        { printf("NEG\n"); }
     | '(' Expr ')'
 
@@ -137,11 +160,12 @@ Expr
 
 //Using this to avoid public prefix problem
 Literal 
-    : INT_LIT { printf("INT_LIT "); } { printf("%d\n", $<i_val>1); }
-    | FLOAT_LIT { printf("FLOAT_LIT "); } { printf("%f\n", $<f_val>1); }
-    | STRING_LIT { printf("STRING_LIT "); } { printf("%s\n", $<s_val>1); }
-    | TRUE { printf("bool TRUE\n"); }
-    | FALSE { printf("bool FALSE\n"); }
+    : INT_LIT { printf("INT_LIT "); expr_type = "i32"; } { printf("%d\n", $<i_val>1); }
+    | FLOAT_LIT { printf("FLOAT_LIT "); expr_type = "f32"; } { printf("%f\n", $<f_val>1); }
+    | '\"' STRING_LIT '\"'{ printf("STRING_LIT "); expr_type = "str"; } { printf("\"%s\"\n", $<s_val>2); }
+    | '\"' '\"'{ printf("STRING_LIT "); expr_type = "str"; } { printf("\"\"\n"); }
+    | TRUE { printf("bool TRUE\n"); expr_type = "bool"; }
+    | FALSE { printf("bool FALSE\n"); expr_type = "bool"; }
 ;
 
 Type
@@ -149,6 +173,7 @@ Type
     | FLOAT {$$ = "f32";}
     | BOOL {$$ = "bool";}
     | STR {$$ = "str";}
+    | '&' STR {$$ = "str";}
 ;
 %%
 
@@ -180,8 +205,8 @@ static void insert_symbol(int addr, char* name, int sc_level) {
 static void lookup_symbol() {
 }
 
-static void dump_symbol() {
-    printf("\n> Dump symbol table (scope level: %d)\n", 0);
+static void dump_symbol(int sc_level) {
+    printf("\n> Dump symbol table (scope level: %d)\n", sc_level);
     printf("%-10s%-10s%-10s%-10s%-10s%-10s%-10s\n",
         "Index", "Name", "Mut","Type", "Addr", "Lineno", "Func_sig");
     printf("%-10d%-10s%-10d%-10s%-10d%-10d%-10s\n",
