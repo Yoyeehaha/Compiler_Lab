@@ -85,8 +85,8 @@ GlobalStatement
 ;
 
 FunctionDeclStmt
-    :
-
+    : { create_symbol(0); } FUNC { printf("func: main\n") } '(' ')' '{' '}'
+;
 %%
 
 /* C code section */
@@ -106,12 +106,12 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-static void create_symbol() {
-    printf("> Create symbol table (scope level %d)\n", 0);
+static void create_symbol(int sc_level) {
+    printf("> Create symbol table (scope level %d)\n", sc_level);
 }
 
-static void insert_symbol() {
-    printf("> Insert `%s` (addr: %d) to scope level %d\n", "XXX", 0, 0);
+static void insert_symbol(int addr, char* name, int sc_level) {
+    printf("> Insert `%s` (addr: %d) to scope level %d\n", name, addr, sc_level);
 }
 
 static void lookup_symbol() {
