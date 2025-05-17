@@ -89,7 +89,8 @@ FunctionDeclStmt
 ;
 
 TypeList
-    :Type 
+    : Type { printf("%s\n", $<s_val>1); } IDENT '=' INT_LIT { printf("%d\n", $<i_val>5); }
+    | Type { printf("%s\n", $<s_val>1); } IDENT '=' FLOAT_LIT { printf("%f\n", $<f_val>5); }
 ;    
 
 Type
