@@ -66,6 +66,13 @@
 /* Nonterminal with return, which need to sepcify type */
 %type <s_val> Type
 
+/* decide the priority (form low to high) */
+%left  LOR
+%left  LAND
+%nonassoc EQL NEQ '>' GEQ '<' LEQ
+%left  '+' '-'
+%left  '*' '/' '%'
+
 /* Yacc will start at this nonterminal */
 %start Program
 
@@ -91,29 +98,51 @@ FunctionDeclStmt
 ;
 
 Content
+    : Content Statement
+    |
+;
+
+Statement
     : PRINTLN '(' '"' STRING_LIT '"' ')' ';' { printf("STRING_LIT"); } { printf(" \""); } { printf("%s", $<s_val>4); } { printf("\"\n"); } { printf("PRINTLN str\n"); } 
-    | PRINTLN '(' ARITHMETIC ')' ';' { printf("PRINTLN %s\n", $<s_val>3); } 
-    | LET ID ':' TypeList ';' { insert_symbol(addr, $<s_val>2, level); } { addr++; } 
-    | Content Content
+    | PRINTLN '(' Expr ')' ';' { printf("PRINTLN not finsh fill what intoit!!!! \n"); } 
+    | PRINT '(' Expr ')' ';' { printf("PRINT not finsh fill what intoit!!!! \n"); } 
+    | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, level); } { addr++; } 
+    | NEWLINE
 ;
 
-ARITHMETIC
-    : ID '+' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("ADD\n"); } 
-    | ID '-' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("SUB\n"); }
-    | ID '*' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("MUL\n"); }
-    | ID '/' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("DIV\n"); }
-    | ID '%' ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); } { printf("IDENT (name=%s, address=%d)\n", $<s_val>3, addr); } { printf("REM\n"); }
-;
+Expr
+    : Expr '+' Expr { printf("ADD\n"); } 
+    | Expr '-' Expr { printf("SUB\n"); }
+    | Expr '*' Expr { printf("MUL\n"); }
+    | Expr '/' Expr { printf("DIV\n"); }
+    | Expr '%' Expr { printf("REM\n"); }
 
-TypeList
-    : Type '=' Literal
-;  
+    | Expr '>' Expr   { printf("GTR\n"); }
+    | Expr GEQ Expr   { printf("GEQ\n"); }
+    | Expr '<' Expr   { printf("LSS\n"); }
+    | Expr LEQ Expr   { printf("LEQ\n"); }
+    | Expr EQL Expr   { printf("EQL\n"); }
+    | Expr NEQ Expr   { printf("NEQ\n"); }
+
+    | Expr LAND Expr  { printf("LAND\n"); }
+    | Expr LOR  Expr  { printf("LOR\n"); }
+
+    | '!' Expr        { printf("NOT\n"); }
+    | '-' Expr        { printf("NEG\n"); }
+    | '(' Expr ')'
+
+    | ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); }
+    | Literal
+;
 
 //Using this to avoid public prefix problem
 Literal 
     : INT_LIT { printf("INT_LIT "); } { printf("%d\n", $<i_val>1); }
     | FLOAT_LIT { printf("FLOAT_LIT "); } { printf("%f\n", $<f_val>1); }
     | STRING_LIT { printf("STRING_LIT "); } { printf("%s\n", $<s_val>1); }
+    | TRUE { printf("bool TRUE\n"); }
+    | FALSE { printf("bool FALSE\n"); }
+;
 
 Type
     : INT {$$ = "i32";}
