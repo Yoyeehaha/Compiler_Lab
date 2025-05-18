@@ -120,21 +120,35 @@ Content
 Statement
     : PRINTLN '(' Expr ')' ';' { printf("PRINTLN %s\n", expr_type); } 
     | PRINT '(' Expr ')' ';' { printf("PRINT %s\n", expr_type); } 
+
     | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
     | LET ID ':' '[' Type ';' Expr ']' '=' '[' Expr ']' ';' { expr_type = "array"; insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
     | LET MUT ID '=' Expr ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
     | LET MUT ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
     | LET MUT ID ':' Type ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }  
+
     | '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
     | IF Expr '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
     | ELSE '{' {create_symbol(++level); } Content '}' { dump_symbol(level--); }
     | WHILE Expr '{' { create_symbol(++level); }Content '}' { dump_symbol(level--); }
+
     | GiveValueStatement ';'
+/*
+    | ID '=' Expr ';' { Symbol* s = lookup_symbol($<s_val>1); 
+                        if (!s) { 
+                            printf("error:%d: undefined: %s\n", yylineno, $<s_val>1); 
+                        } else if (!s->mut) { 
+                            printf("error:%d: cannot borrow immutable borrowed content `%s` as mutable\n", yylineno, $<s_val>1); 
+                        } else {
+                            printf("ASSIGN\n");
+                        }      
+                      }
+*/
     | NEWLINE
 ;
 
 GiveValueStatement
-    : ID '=' Expr          { printf("ASSIGN\n");  }
+    : ID '=' Expr            { printf("ASSIGN\n");} 
     | ID ADD_ASSIGN Expr     { printf("ADD_ASSIGN\n");  }
     | ID SUB_ASSIGN Expr     { printf("SUB_ASSIGN\n");  }
     | ID MUL_ASSIGN Expr     { printf("MUL_ASSIGN\n");  }
@@ -160,7 +174,7 @@ Expr
     | Expr LAND Expr  { printf("LAND\n"); }
     | Expr LOR  Expr  { printf("LOR\n"); }
 
-    | Expr AS Type    { if (strcmp(expr_type, "f32") == 0 && strcmp($<s_val>3, "i32") == 0) {
+    | Expr AS Type    { if (strcmp($<s_val>3, "i32") == 0) {
                             printf("f2i\n"); expr_type = "i32";
                         } else {
                             printf("i2f\n"); expr_type = "f32";
@@ -171,7 +185,7 @@ Expr
     | '-' Expr  %prec NOT_UMINUS  { printf("NEG\n"); }
     | '(' Expr ')'
     | Expr ',' Expr //for array
-    | ID '[' Expr ']' { Symbol* s = lookup_symbol($<s_val>1); printf("IDENT (name=%s, address=%d)\n", s->name, s->addr); }
+    | ID '[' { Symbol* s = lookup_symbol($<s_val>1); printf("IDENT (name=%s, address=%d)\n", s->name, s->addr); } Expr ']' { expr_type = "array"; }
 
     | ID { Symbol* s = lookup_symbol($<s_val>1); printf("IDENT (name=%s, address=%d)\n", s->name, s->addr); expr_type = s->type; }
     | Literal    
@@ -188,11 +202,11 @@ Literal
 ;
 
 Type
-    : INT {$$ = "i32";}
-    | FLOAT {$$ = "f32";}
-    | BOOL {$$ = "bool";}
-    | STR {$$ = "str";}
-    | '&' STR {$$ = "str";}
+    : INT {$$ = "i32"; expr_type = "i32";}
+    | FLOAT {$$ = "f32"; expr_type = "f32";}
+    | BOOL {$$ = "bool"; expr_type = "bool";}
+    | STR {$$ = "str"; expr_type = "str";}
+    | '&' STR {$$ = "str"; expr_type = "str";}
 ;
 %%
 
@@ -229,7 +243,7 @@ static void insert_symbol(int addr, char* name, int mut, int sc_level) {
     s.lineno = yylineno + 1;
     if (sc_level == 0) {
         strcpy(s.type, "func");
-        strcpy(s.func_sig, "V(V)");
+        strcpy(s.func_sig, "(V)V");
     } else {
         strcpy(s.func_sig, "-");
     }

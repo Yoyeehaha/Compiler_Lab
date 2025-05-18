@@ -6,7 +6,7 @@ YAC_SRC := compiler.y
 HEADER := compiler_common.h
 COMPILER := myscanner
 EXEC := Main
-v := 0
+VERBOSE := 0
 
 all: ${COMPILER}
 
