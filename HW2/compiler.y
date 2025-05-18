@@ -11,6 +11,19 @@
     extern FILE *yyin;
 
     int yylex_destroy ();
+
+    typedef struct {
+        char name[64];
+        int mut;
+        char type[16];
+        int addr;
+        int lineno;
+        char func_sig[32];  // For function signature or `"-"` for variables
+    } Symbol;
+
+    Symbol symbol_tables[10][100]; // 10 levels max, 100 symbols each
+    int symbol_count[10];          // 每層目前有幾個 symbol
+
     int addr = -1, level = 0;
     static const char* expr_type = "i32";
     void yyerror (char const *s)
@@ -27,7 +40,7 @@
     /* parameters and return type can be changed */
     static void create_symbol();
     static void insert_symbol();
-    static void lookup_symbol();
+    static Symbol* lookup_symbol();
     static void dump_symbol();
 
     /* Global variables */
@@ -96,7 +109,7 @@ GlobalStatement
 ;
 
 FunctionDeclStmt
-    : { create_symbol(0); } FUNC { printf("func: main\n"); } ID { insert_symbol(addr, "main", 0); } { addr++; level++;} { create_symbol(1); } '(' ')' '{' Content '}' { dump_symbol(--level); }
+    : { create_symbol(0); } FUNC { printf("func: main\n"); } ID { insert_symbol(addr, "main", -1, 0); } { addr++; level++;} { create_symbol(1); } '(' ')' '{' Content { dump_symbol(level--); } '}' { dump_symbol(level--); }
 ;
 
 Content
@@ -107,14 +120,15 @@ Content
 Statement
     : PRINTLN '(' Expr ')' ';' { printf("PRINTLN %s\n", expr_type); } 
     | PRINT '(' Expr ')' ';' { printf("PRINT %s\n", expr_type); } 
-    | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, level); } { addr++; }
-    | LET ID ':' '[' Type ';' Expr ']' '=' '[' Expr ']' ';'
-    | LET MUT ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>3, level); } { addr++; }
-    | LET MUT ID ':' Type ';' { insert_symbol(addr, $<s_val>3, level); } { addr++; }  
+    | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
+    | LET ID ':' '[' Type ';' Expr ']' '=' '[' Expr ']' ';' { expr_type = "array"; insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
+    | LET MUT ID '=' Expr ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
+    | LET MUT ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
+    | LET MUT ID ':' Type ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }  
     | '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
-    | IF Expr '{' { create_symbol(level++); } Content '}' { dump_symbol(level--); }
-    | ELSE '{' {create_symbol(level++); } Content '}' { dump_symbol(level--); }
-    | WHILE Expr '{' { create_symbol(level++); }Content '}' { dump_symbol(level--); }
+    | IF Expr '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
+    | ELSE '{' {create_symbol(++level); } Content '}' { dump_symbol(level--); }
+    | WHILE Expr '{' { create_symbol(++level); }Content '}' { dump_symbol(level--); }
     | GiveValueStatement ';'
     | NEWLINE
 ;
@@ -154,13 +168,13 @@ Expr
                       }
 
     | '!' Expr  %prec NOT_UMINUS  { printf("NOT\n"); }
-    | '-' Expr        { printf("NEG\n"); }
+    | '-' Expr  %prec NOT_UMINUS  { printf("NEG\n"); }
     | '(' Expr ')'
-    | ',' Expr //for array
-    | Expr '[' Expr ']' { expr_type = "array"; }
+    | Expr ',' Expr //for array
+    | ID '[' Expr ']' { Symbol* s = lookup_symbol($<s_val>1); printf("IDENT (name=%s, address=%d)\n", s->name, s->addr); }
 
-    | ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); }
-    | Literal
+    | ID { Symbol* s = lookup_symbol($<s_val>1); printf("IDENT (name=%s, address=%d)\n", s->name, s->addr); expr_type = s->type; }
+    | Literal    
 ;
 
 //Using this to avoid public prefix problem
@@ -199,21 +213,49 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+// To create a new symbol table
 static void create_symbol(int sc_level) {
+    symbol_count[sc_level] = 0;
     printf("> Create symbol table (scope level %d)\n", sc_level);
 }
 
-static void insert_symbol(int addr, char* name, int sc_level) {
+// To insert a new symbol into the symbol table
+static void insert_symbol(int addr, char* name, int mut, int sc_level) {
+    Symbol s;
+    strcpy(s.name, name);
+    strcpy(s.type, expr_type);
+    s.addr = addr;
+    s.mut = mut;
+    s.lineno = yylineno + 1;
+    if (sc_level == 0) {
+        strcpy(s.type, "func");
+        strcpy(s.func_sig, "V(V)");
+    } else {
+        strcpy(s.func_sig, "-");
+    }
+    
+    symbol_tables[sc_level][symbol_count[sc_level]++] = s;
     printf("> Insert `%s` (addr: %d) to scope level %d\n", name, addr, sc_level);
 }
 
-static void lookup_symbol() {
+// To lookup the right symbol
+static Symbol* lookup_symbol(const char* name) {
+    for (int i = level; i >= 0; i--) {
+        for (int j = 0; j < symbol_count[i]; j++) {
+            if (strcmp(symbol_tables[i][j].name, name) == 0) {
+                return &symbol_tables[i][j];
+            }
+        }
+    }
 }
 
+// To dump the symbol table
 static void dump_symbol(int sc_level) {
     printf("\n> Dump symbol table (scope level: %d)\n", sc_level);
     printf("%-10s%-10s%-10s%-10s%-10s%-10s%-10s\n",
         "Index", "Name", "Mut","Type", "Addr", "Lineno", "Func_sig");
-    printf("%-10d%-10s%-10d%-10s%-10d%-10d%-10s\n",
-            0, "name", 0, "type", 0, 0, "func_sig");
+    for (int i = 0; i < symbol_count[sc_level]; i++) {
+        Symbol* s = &symbol_tables[sc_level][i];
+        printf("%-10d%-10s%-10d%-10s%-10d%-10d%-10s\n", i, s->name, s->mut, s->type, s->addr, s->lineno, s->func_sig);
+    }
 }
