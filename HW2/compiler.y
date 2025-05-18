@@ -105,13 +105,14 @@ Content
 ;
 
 Statement
-    : PRINTLN '(' '"' STRING_LIT '"' ')' ';' { printf("STRING_LIT"); } { printf("\"%s\"\n", $<s_val>4); } { printf("PRINTLN str\n"); } 
-    | PRINTLN '(' Expr ')' ';' { printf("PRINTLN %s\n", expr_type); } 
+    : PRINTLN '(' Expr ')' ';' { printf("PRINTLN %s\n", expr_type); } 
     | PRINT '(' Expr ')' ';' { printf("PRINT %s\n", expr_type); } 
     | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, level); } { addr++; }
     | LET MUT ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>3, level); } { addr++; }
     | LET MUT ID ':' Type ';' { insert_symbol(addr, $<s_val>3, level); } { addr++; }  
     | '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
+    | IF Expr '{' Content '}' { dump_symbol(level--); }
+    | WHILE Expr '{' Content '}' { dump_symbol(level--); }
     | GiveValueStatement ';'
     | NEWLINE
 ;
