@@ -108,11 +108,13 @@ Statement
     : PRINTLN '(' Expr ')' ';' { printf("PRINTLN %s\n", expr_type); } 
     | PRINT '(' Expr ')' ';' { printf("PRINT %s\n", expr_type); } 
     | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, level); } { addr++; }
+    | LET ID ':' '[' Type ';' Expr ']' '=' '[' Expr ']' ';'
     | LET MUT ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>3, level); } { addr++; }
     | LET MUT ID ':' Type ';' { insert_symbol(addr, $<s_val>3, level); } { addr++; }  
     | '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
-    | IF Expr '{' Content '}' { dump_symbol(level--); }
-    | WHILE Expr '{' Content '}' { dump_symbol(level--); }
+    | IF Expr '{' { create_symbol(level++); } Content '}' { dump_symbol(level--); }
+    | ELSE '{' {create_symbol(level++); } Content '}' { dump_symbol(level--); }
+    | WHILE Expr '{' { create_symbol(level++); }Content '}' { dump_symbol(level--); }
     | GiveValueStatement ';'
     | NEWLINE
 ;
@@ -154,6 +156,8 @@ Expr
     | '!' Expr  %prec NOT_UMINUS  { printf("NOT\n"); }
     | '-' Expr        { printf("NEG\n"); }
     | '(' Expr ')'
+    | ',' Expr //for array
+    | Expr '[' Expr ']' { expr_type = "array"; }
 
     | ID { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, addr); }
     | Literal
