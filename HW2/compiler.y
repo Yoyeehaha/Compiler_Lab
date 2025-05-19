@@ -128,9 +128,7 @@ Statement
 
     | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
     | LET ID ':' '[' Type ';' Expr ']' '=' '[' Expr ']' ';' { expr_type = "array"; insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
-    | LET MUT ID '=' Expr ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
-    | LET MUT ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
-    | LET MUT ID ':' Type ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }  
+    | LET MUT ID LetMutId { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
 
     | '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
     | IF Expr '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
@@ -140,6 +138,12 @@ Statement
     | GiveValueStatement ';'
 
     | NEWLINE
+;
+
+LetMutId
+    : '=' Expr ';' 
+    | ':' Type '=' Expr ';' 
+    | ':' Type ';' 
 ;
 
 
