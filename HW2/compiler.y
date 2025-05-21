@@ -69,13 +69,13 @@
 %token IF ELSE FOR WHILE LOOP
 %token PRINT PRINTLN
 %token FUNC RETURN BREAK
-%token ID ARROW AS IN DOTDOT RSHIFT LSHIFT
+%token ARROW AS IN DOTDOT RSHIFT LSHIFT
 
 /* Token with return, which need to sepcify type */
 %token <i_val> INT_LIT
 %token <f_val> FLOAT_LIT
 %token <s_val> STRING_LIT
-%token <s_val> IDENT
+%token <s_val> ID
 
 /* Nonterminal with return, which need to sepcify type */
 %type <s_val> Type
