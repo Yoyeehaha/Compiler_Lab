@@ -152,12 +152,11 @@ GiveValueStatement
                                 Symbol* s = lookup_symbol($<s_val>1); 
                                 if (s == NULL) { 
                                     printf("error:%d: undefined: %s\n", yylineno + 1, $<s_val>1); 
-                                } else if (!(s->mut) && !HAS_ERROR) { 
+                                } else if (!(s->mut)) { 
                                     printf("ASSIGN\n");
                                     printf("error:%d: cannot borrow immutable borrowed content `%s` as mutable\n", yylineno + 1, $<s_val>1); 
                                 } else {
                                     printf("ASSIGN\n");
-                                    HAS_ERROR = false;
                                 }
                              } 
     | ID ADD_ASSIGN Expr     { printf("ADD_ASSIGN\n");  }
@@ -186,7 +185,6 @@ Expr
                         printf("IDENT (name=%s, address=%d)\n", s2->name, s2->addr);
                         if (strcmp(s1->type, s2->type) != 0) {
                             printf("error:%d: invalid operation: LSHIFT (mismatched types %s and %s)\n", yylineno + 1, s1->type, s2->type);
-                            HAS_ERROR = true;
                         } 
                         printf("LSHIFT\n");
                       }
