@@ -125,7 +125,7 @@ GlobalStatement
 
 
 FunctionDeclStmt
-    : { create_symbol(0); } FUNC { CODEGEN(".method public static main([Ljava/lang/String;)V\n") } ID { insert_symbol(addr, "main", -1, 0); } { addr++; level++;} { create_symbol(1); } '(' ')' '{' Content { dump_symbol(level--); } '}' { dump_symbol(level--); }
+    : { create_symbol(0); } FUNC { printf("func: main\n"); } ID { insert_symbol(addr, "main", -1, 0); } { addr++; level++;} { create_symbol(1); } '(' ')' '{' Content { dump_symbol(level--); } '}' { dump_symbol(level--); }
 ;
 
 
