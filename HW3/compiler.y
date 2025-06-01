@@ -125,7 +125,7 @@ GlobalStatement
 
 
 FunctionDeclStmt
-    : { create_symbol(0); } FUNC { printf("func: main\n"); } ID { insert_symbol(addr, "main", -1, 0); } { addr++; level++;} { create_symbol(1); } '(' ')' '{' Content { dump_symbol(level--); } '}' { dump_symbol(level--); }
+    : { create_symbol(0); } FUNC { CODEGEN("\n"); CODEGEN(".method public static main([Ljava/lang/String;)V\n"); } ID { insert_symbol(addr, "main", -1, 0); } { addr++; level++;} { create_symbol(1); CODEGEN(".limit stack 100\n"); CODEGEN(".limit locals 100\n");} '(' ')' '{' Content { dump_symbol(level--); } '}' { CODEGEN("return\n"); CODEGEN(".end method\n"); }
 ;
 
 
@@ -136,7 +136,7 @@ Content
 
 
 Statement
-    : PRINTLN '(' Expr ')' ';' { printf("PRINTLN %s\n", expr_type); } 
+    : PRINTLN { CODEGEN("getstatic java/lang/System/out Ljava/io/PrintStream;\n"); } '(' Expr { CODEGEN("ldc \"Hello World!\";\n"); } ')' ';' { CODEGEN("invokevirtual java/io/PrintStream/println(I)V\n"); } 
     | PRINT '(' Expr ')' ';' { printf("PRINT %s\n", expr_type); } 
 
     | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
@@ -257,7 +257,7 @@ Expr
 Literal 
     : INT_LIT { printf("INT_LIT "); expr_type = "i32"; } { printf("%d\n", $<i_val>1); } 
     | FLOAT_LIT { printf("FLOAT_LIT "); expr_type = "f32"; } { printf("%f\n", $<f_val>1); }
-    | '\"' STRING_LIT '\"'{ printf("STRING_LIT "); expr_type = "str"; } { printf("\"%s\"\n", $<s_val>2); }
+    | '\"' STRING_LIT '\"' { printf("STRING_LIT "); expr_type = "str"; } 
     | '\"' '\"'{ printf("STRING_LIT "); expr_type = "str"; } { printf("\"\"\n"); }
     | TRUE { printf("bool TRUE\n"); expr_type = "bool"; }
     | FALSE { printf("bool FALSE\n"); expr_type = "bool"; }
