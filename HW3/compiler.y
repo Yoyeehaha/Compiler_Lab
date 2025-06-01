@@ -136,10 +136,20 @@ Content
 
 
 Statement
-    : PRINTLN { CODEGEN("getstatic java/lang/System/out Ljava/io/PrintStream;\n"); } '(' Expr { CODEGEN("ldc \"Hello World!\";\n"); } ')' ';' { CODEGEN("invokevirtual java/io/PrintStream/println(I)V\n"); } 
-    | PRINT '(' Expr ')' ';' { printf("PRINT %s\n", expr_type); } 
+    : PRINTLN { CODEGEN("getstatic java/lang/System/out Ljava/io/PrintStream;\n"); } '(' Expr ')' ';'  { 
+                                                                                                        if(strcmp(expr_type, "i32") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(I)V\n"); } 
+                                                                                                        else if(strcmp(expr_type, "f32") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(F)V\n"); }   
+                                                                                                        else if(strcmp(expr_type, "str") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V\n"); } 
+                                                                                                        else if(strcmp(expr_type, "bool") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(Z)V\n"); } 
+                                                                                                       }
+    | PRINT { CODEGEN("getstatic java/lang/System/out Ljava/io/PrintStream;\n"); } '(' Expr ')' ';'    { 
+                                                                                                        if(strcmp(expr_type, "i32") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(I)V\n"); } 
+                                                                                                        else if(strcmp(expr_type, "f32") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(F)V\n"); }   
+                                                                                                        else if(strcmp(expr_type, "str") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V\n"); } 
+                                                                                                        else if(strcmp(expr_type, "bool") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(Z)V\n"); } 
+                                                                                                       }
 
-    | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
+    | LET ID ':' Type '=' Expr ';' { if (strcmp(expr_type, "i32") == 0) { CODEGEN("istore %d\n", addr); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fstore %d\n", addr); }} { addr++; }
     | LET ID ':' '[' Type ';' Expr ']' '=' '[' Expr ']' ';' { expr_type = "array"; insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
     | LET MUT ID LetMutId { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
 
@@ -182,12 +192,12 @@ GiveValueStatement
 
 
 Expr
-    : Expr '+' Expr { printf("ADD\n"); } 
+    : Expr '+' Expr { printf("ADD\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("iadd\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fadd\n"); } }  
     //Arithmetic operation
-    | Expr '-' Expr { printf("SUB\n"); }
-    | Expr '*' Expr { printf("MUL\n"); }
-    | Expr '/' Expr { printf("DIV\n"); }
-    | Expr '%' Expr { printf("REM\n"); }
+    | Expr '-' Expr { printf("SUB\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("isub\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fsub\n"); } }  
+    | Expr '*' Expr { printf("MUL\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("imul\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fmul\n"); } }
+    | Expr '/' Expr { printf("DIV\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("idiv\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fdiv\n"); } }
+    | Expr '%' Expr { printf("REM\n"); } { CODEGEN("imul\n"); } 
 
 
     //for checking error
@@ -230,7 +240,7 @@ Expr
 
     //unary operation
     | '!' Expr  %prec NOT_UMINUS  { printf("NOT\n"); }
-    | '-' Expr  %prec NOT_UMINUS  { printf("NEG\n"); }
+    | '-' Expr  %prec NOT_UMINUS  { printf("NEG\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("ineg\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fneg\n"); } }
     | '(' Expr ')'
 
 
@@ -255,9 +265,9 @@ Expr
 
 //Using this to avoid public prefix problem
 Literal 
-    : INT_LIT { printf("INT_LIT "); expr_type = "i32"; } { printf("%d\n", $<i_val>1); } 
-    | FLOAT_LIT { printf("FLOAT_LIT "); expr_type = "f32"; } { printf("%f\n", $<f_val>1); }
-    | '\"' STRING_LIT '\"' { printf("STRING_LIT "); expr_type = "str"; } 
+    : INT_LIT { printf("INT_LIT "); expr_type = "i32"; } { CODEGEN("ldc %d\n", $<i_val>1); } 
+    | FLOAT_LIT { printf("FLOAT_LIT "); expr_type = "f32"; } { CODEGEN("ldc %f\n", $<f_val>1); } 
+    | '\"' STRING_LIT '\"' { printf("STRING_LIT "); expr_type = "str"; } { CODEGEN("ldc \"%s\"\n", $<s_val>2); } 
     | '\"' '\"'{ printf("STRING_LIT "); expr_type = "str"; } { printf("\"\"\n"); }
     | TRUE { printf("bool TRUE\n"); expr_type = "bool"; }
     | FALSE { printf("bool FALSE\n"); expr_type = "bool"; }
