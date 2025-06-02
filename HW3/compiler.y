@@ -157,9 +157,9 @@ Statement
     | LET MUT ID ':' Type ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
 
     | '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
-    | IF Expr '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
+    | IF { CODEGEN("L%d:\n", level); } Expr '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); } { CODEGEN("L%dEND:\n",level); } { level += 3; } 
     | ELSE '{' {create_symbol(++level); } Content '}' { dump_symbol(level--); }
-    | WHILE Expr '{' { create_symbol(++level); }Content '}' { dump_symbol(level--); }
+    | WHILE { int label_start = new_label(); CODEGEN("L%d:\n", label_start); } Expr '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); } { CODEGEN("goto L0\nL0_END:\n"); } 
 
     | GiveValueStatement ';'
 
@@ -279,27 +279,24 @@ Expr
                         CODEGEN("L%d:\n", label_end);
                       }
     | Expr GEQ Expr   { printf("GEQ\n"); }
-    | Expr '<' Expr   { printf("LSS\n"); }
+    | Expr '<' Expr   { 
+                        int label_true = new_label(); 
+                        CODEGEN("if_icmplt L%d\n", label_true);
+                        CODEGEN("goto L0_END\n");
+                        CODEGEN("L%d:\n", label_true); 
+                      }
     | Expr LEQ Expr   { printf("LEQ\n"); }
     | Expr EQL Expr   { 
-                        int label_true = new_label(); 
-                        int label_end = new_label(); 
-                        CODEGEN("if_icmpgt L%d\n", label_true); 
-                        CODEGEN("iconst_0\n"); 
-                        CODEGEN("goto L%d\n", label_end);
-                        CODEGEN("L%d:\n", label_true);
-                        CODEGEN("iconst_1\n");
-                        CODEGEN("L%d:\n", label_end); 
+                        int label_true = level + 1; 
+                        CODEGEN("if_icmpeq L%d\n", label_true);
+                        CODEGEN("goto L%dEND\n", level);
+                        CODEGEN("L%d:\n", label_true); 
                       }
     | Expr NEQ Expr   { 
-                        int label_true = new_label(); 
-                        int label_end = new_label(); 
-                        CODEGEN("if_icmpgt L%d\n", label_true); 
-                        CODEGEN("iconst_0\n"); 
-                        CODEGEN("goto L%d\n", label_end);
-                        CODEGEN("L%d:\n", label_true);
-                        CODEGEN("iconst_1\n");
-                        CODEGEN("L%d:\n", label_end); 
+                        int label_true = level + 1; 
+                        CODEGEN("if_icmpne L%d\n", label_true);
+                        CODEGEN("goto L%dEND\n", level);
+                        CODEGEN("L%d:\n", label_true); 
                       } 
 
 
