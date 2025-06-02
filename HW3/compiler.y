@@ -25,7 +25,7 @@
     Symbol symbol_tables[10][100]; // 10 levels max, 100 symbols each
     int symbol_count[10];          // 每層目前有幾個 symbol
 
-    int addr = -1, level = 0;
+    int addr = -1, level = 0, label_count = 0;
     static const char* expr_type = "i32";
     void yyerror (char const *s)
     {
@@ -53,6 +53,7 @@
     static void insert_symbol();
     static Symbol* lookup_symbol();
     static void dump_symbol();
+    int new_label();
 
     /* Global variables */
     bool g_has_error = false;
@@ -94,12 +95,13 @@
 %type <s_val> Type
 
 /* decide the priority (form low to high) */
-%left  LOR
-%left  LAND
-%nonassoc EQL NEQ '>' GEQ '<' LEQ
-%left  '+' '-'
-%left  '*' '/' '%'
-%right  NOT_UMINUS //To rise the priority of 'NOT' 
+%left LOR
+%left LAND
+%left EQL NEQ
+%left '>' '<' GEQ LEQ
+%left '+' '-'
+%left '*' '/' '%'
+%right NOT_UMINUS //To rise the priority of 'NOT' 
 
 /* Yacc will start at this nonterminal */
 %start Program
@@ -143,15 +145,16 @@ Statement
                                                                                                         else if(strcmp(expr_type, "bool") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(Z)V\n"); } 
                                                                                                        }
     | PRINT { CODEGEN("getstatic java/lang/System/out Ljava/io/PrintStream;\n"); } '(' Expr ')' ';'    { 
-                                                                                                        if(strcmp(expr_type, "i32") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(I)V\n"); } 
-                                                                                                        else if(strcmp(expr_type, "f32") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(F)V\n"); }   
-                                                                                                        else if(strcmp(expr_type, "str") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V\n"); } 
-                                                                                                        else if(strcmp(expr_type, "bool") == 0) { CODEGEN("invokevirtual java/io/PrintStream/println(Z)V\n"); } 
+                                                                                                        if(strcmp(expr_type, "i32") == 0) { CODEGEN("invokevirtual java/io/PrintStream/print(I)V\n"); } 
+                                                                                                        else if(strcmp(expr_type, "f32") == 0) { CODEGEN("invokevirtual java/io/PrintStream/print(F)V\n"); }   
+                                                                                                        else if(strcmp(expr_type, "str") == 0) { CODEGEN("invokevirtual java/io/PrintStream/print(Ljava/lang/String;)V\n"); } 
+                                                                                                        else if(strcmp(expr_type, "bool") == 0) { CODEGEN("invokevirtual java/io/PrintStream/print(Z)V\n"); } 
                                                                                                        }
 
-    | LET ID ':' Type '=' Expr ';' { if (strcmp(expr_type, "i32") == 0) { CODEGEN("istore %d\n", addr); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fstore %d\n", addr); }} { addr++; }
+    | LET ID ':' Type '=' Expr ';' { insert_symbol(addr, $<s_val>2, 0, level); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("istore %d\n", addr); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fstore %d\n", addr); }else if (strcmp(expr_type, "str") == 0){ CODEGEN("astore %d\n", addr); }else if (strcmp(expr_type, "bool") == 0) { CODEGEN("istore %d\n", addr); }} { addr++; }
     | LET ID ':' '[' Type ';' Expr ']' '=' '[' Expr ']' ';' { expr_type = "array"; insert_symbol(addr, $<s_val>2, 0, level); } { addr++; }
-    | LET MUT ID LetMutId { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
+    | LET MUT ID LetMutId { insert_symbol(addr, $<s_val>3, 1, level); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("istore %d\n", addr); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fstore %d\n", addr); } else if (strcmp(expr_type, "str") == 0){ CODEGEN("astore %d\n", addr); }else if (strcmp(expr_type, "bool") == 0) { CODEGEN("istore %d\n", addr); } } { addr++; }
+    | LET MUT ID ':' Type ';' { insert_symbol(addr, $<s_val>3, 1, level); } { addr++; }
 
     | '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
     | IF Expr '{' { create_symbol(++level); } Content '}' { dump_symbol(level--); }
@@ -166,38 +169,83 @@ Statement
 LetMutId
     : '=' Expr ';' 
     | ':' Type '=' Expr ';' 
-    | ':' Type ';' 
 ;
 
 
 GiveValueStatement
     : ID '=' Expr            { 
                                 Symbol* s = lookup_symbol($<s_val>1); 
-                                if (s == NULL) { 
-                                    printf("error:%d: undefined: %s\n", yylineno + 1, $<s_val>1); 
-                                } else if (!(s->mut)) { 
-                                    printf("ASSIGN\n");
-                                    printf("error:%d: cannot borrow immutable borrowed content `%s` as mutable\n", yylineno + 1, $<s_val>1); 
-                                } else {
-                                    printf("ASSIGN\n");
+                                if (strcmp(expr_type, "i32") == 0) {
+                                    CODEGEN("istore %d\n", s->addr); 
+                                } else if (strcmp(expr_type, "f32") == 0) { 
+                                    CODEGEN("fstore %d\n", s->addr); 
+                                } else if (strcmp(expr_type, "str") == 0) {
+                                    CODEGEN("astore %d\n", s->addr); 
+                                } else if (strcmp(expr_type, "bool") == 0) {
+                                    CODEGEN("istore %d\n", s->addr); 
                                 }
                              } 
-    | ID ADD_ASSIGN Expr     { printf("ADD_ASSIGN\n");  }
-    | ID SUB_ASSIGN Expr     { printf("SUB_ASSIGN\n");  }
-    | ID MUL_ASSIGN Expr     { printf("MUL_ASSIGN\n");  }
-    | ID DIV_ASSIGN Expr     { printf("DIV_ASSIGN\n");  }
-    | ID REM_ASSIGN Expr     { printf("REM_ASSIGN\n");  }
+    | ID {Symbol* s = lookup_symbol($<s_val>1); if (strcmp(expr_type, "i32") == 0) { CODEGEN("iload %d\n", s->addr); } else if (strcmp(expr_type, "f32") == 0) {CODEGEN("fload %d\n", s->addr); } } 
+      ADD_ASSIGN Expr { 
+                        Symbol* s = lookup_symbol($<s_val>1);  
+                        if (strcmp(expr_type, "i32") == 0) {                            
+                            CODEGEN("iadd\n"); 
+                            CODEGEN("istore %d\n", s->addr); 
+                        } else if (strcmp(expr_type, "f32") == 0) {                           
+                            CODEGEN("fadd\n");
+                            CODEGEN("fstore %d\n", s->addr); 
+                        } 
+                      }
+    | ID {Symbol* s = lookup_symbol($<s_val>1); if (strcmp(expr_type, "i32") == 0) { CODEGEN("iload %d\n", s->addr); } else if (strcmp(expr_type, "f32") == 0) {CODEGEN("fload %d\n", s->addr); } }
+      SUB_ASSIGN Expr { 
+                        Symbol* s = lookup_symbol($<s_val>1);  
+                        if (strcmp(expr_type, "i32") == 0) {      
+                            CODEGEN("isub\n"); 
+                            CODEGEN("istore %d\n", s->addr); 
+                        } else if (strcmp(expr_type, "f32") == 0) {        
+                            CODEGEN("fsub\n");
+                            CODEGEN("fstore %d\n", s->addr); 
+                        }
+                      }
+    | ID {Symbol* s = lookup_symbol($<s_val>1); if (strcmp(expr_type, "i32") == 0) { CODEGEN("iload %d\n", s->addr); } else if (strcmp(expr_type, "f32") == 0) {CODEGEN("fload %d\n", s->addr); } }
+      MUL_ASSIGN Expr { 
+                        Symbol* s = lookup_symbol($<s_val>1);  
+                        if (strcmp(expr_type, "i32") == 0) {  
+                            CODEGEN("imul\n"); 
+                            CODEGEN("istore %d\n", s->addr); 
+                        } else if (strcmp(expr_type, "f32") == 0) {
+                            CODEGEN("fmul\n");
+                            CODEGEN("fstore %d\n", s->addr); 
+                        }
+                      }
+    | ID {Symbol* s = lookup_symbol($<s_val>1); if (strcmp(expr_type, "i32") == 0) { CODEGEN("iload %d\n", s->addr); } else if (strcmp(expr_type, "f32") == 0) {CODEGEN("fload %d\n", s->addr); } }
+      DIV_ASSIGN Expr { 
+                        Symbol* s = lookup_symbol($<s_val>1);  
+                        if (strcmp(expr_type, "i32") == 0) { 
+                            CODEGEN("idiv\n"); 
+                            CODEGEN("istore %d\n", s->addr); 
+                        } else if (strcmp(expr_type, "f32") == 0) {
+                            CODEGEN("fdiv\n");
+                            CODEGEN("fstore %d\n", s->addr); 
+                        } 
+                      }
+    | ID {Symbol* s = lookup_symbol($<s_val>1); if (strcmp(expr_type, "i32") == 0) { CODEGEN("iload %d\n", s->addr); } else if (strcmp(expr_type, "f32") == 0) {CODEGEN("fload %d\n", s->addr); } }
+      REM_ASSIGN Expr { 
+                            Symbol* s = lookup_symbol($<s_val>1);
+                            CODEGEN("irem\n");
+                            CODEGEN("istore %d\n", s->addr);
+                      }
     | Expr
 ;
 
 
 Expr
-    : Expr '+' Expr { printf("ADD\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("iadd\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fadd\n"); } }  
+    : Expr '+' Expr { if (strcmp(expr_type, "i32") == 0) { CODEGEN("iadd\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fadd\n"); } }  
     //Arithmetic operation
-    | Expr '-' Expr { printf("SUB\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("isub\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fsub\n"); } }  
-    | Expr '*' Expr { printf("MUL\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("imul\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fmul\n"); } }
-    | Expr '/' Expr { printf("DIV\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("idiv\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fdiv\n"); } }
-    | Expr '%' Expr { printf("REM\n"); } { CODEGEN("imul\n"); } 
+    | Expr '-' Expr { if (strcmp(expr_type, "i32") == 0) { CODEGEN("isub\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fsub\n"); } }  
+    | Expr '*' Expr { if (strcmp(expr_type, "i32") == 0) { CODEGEN("imul\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fmul\n"); } }
+    | Expr '/' Expr { if (strcmp(expr_type, "i32") == 0) { CODEGEN("idiv\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fdiv\n"); } }
+    | Expr '%' Expr { CODEGEN("irem\n"); } 
 
 
     //for checking error
@@ -215,32 +263,64 @@ Expr
 
 
     //Comparison operation
-    | Expr '>' Expr   { printf("GTR\n"); }
+    | Expr '>' Expr   {  
+                        int label_true = new_label(); 
+                        int label_end = new_label(); 
+                        if (strcmp(expr_type, "i32") == 0) {
+                            CODEGEN("if_icmpgt L%d\n", label_true);
+                        } else {
+                            CODEGEN("fcmpg\n");
+                            CODEGEN("ifgt L%d\n", label_true);
+                        } 
+                        CODEGEN("iconst_0\n"); 
+                        CODEGEN("goto L%d\n", label_end);
+                        CODEGEN("L%d:\n", label_true);
+                        CODEGEN("iconst_1\n");
+                        CODEGEN("L%d:\n", label_end);
+                      }
     | Expr GEQ Expr   { printf("GEQ\n"); }
     | Expr '<' Expr   { printf("LSS\n"); }
     | Expr LEQ Expr   { printf("LEQ\n"); }
-    | Expr EQL Expr   { printf("EQL\n"); }
-    | Expr NEQ Expr   { printf("NEQ\n"); }
+    | Expr EQL Expr   { 
+                        int label_true = new_label(); 
+                        int label_end = new_label(); 
+                        CODEGEN("if_icmpgt L%d\n", label_true); 
+                        CODEGEN("iconst_0\n"); 
+                        CODEGEN("goto L%d\n", label_end);
+                        CODEGEN("L%d:\n", label_true);
+                        CODEGEN("iconst_1\n");
+                        CODEGEN("L%d:\n", label_end); 
+                      }
+    | Expr NEQ Expr   { 
+                        int label_true = new_label(); 
+                        int label_end = new_label(); 
+                        CODEGEN("if_icmpgt L%d\n", label_true); 
+                        CODEGEN("iconst_0\n"); 
+                        CODEGEN("goto L%d\n", label_end);
+                        CODEGEN("L%d:\n", label_true);
+                        CODEGEN("iconst_1\n");
+                        CODEGEN("L%d:\n", label_end); 
+                      } 
 
 
     //Logical operation
-    | Expr LAND Expr  { printf("LAND\n"); }
-    | Expr LOR  Expr  { printf("LOR\n"); }
+    | Expr LAND Expr  { CODEGEN("iand\n"); }
+    | Expr LOR  Expr  { CODEGEN("ior\n"); } 
 
 
     //AS operation
     | Expr AS Type    { 
                         if (strcmp($<s_val>3, "i32") == 0) {
-                            printf("f2i\n"); expr_type = "i32";
+                            CODEGEN("f2i\n"); expr_type = "i32";
                         } else {
-                            printf("i2f\n"); expr_type = "f32";
+                            CODEGEN("i2f\n"); expr_type = "f32";
                         }
                       }
                       
 
     //unary operation
-    | '!' Expr  %prec NOT_UMINUS  { printf("NOT\n"); }
-    | '-' Expr  %prec NOT_UMINUS  { printf("NEG\n"); } { if (strcmp(expr_type, "i32") == 0) { CODEGEN("ineg\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fneg\n"); } }
+    | '!' Expr  %prec NOT_UMINUS  { CODEGEN("iconst_1\nixor\n"); }
+    | '-' Expr  %prec NOT_UMINUS  { if (strcmp(expr_type, "i32") == 0) { CODEGEN("ineg\n"); } else if (strcmp(expr_type, "f32") == 0) { CODEGEN("fneg\n"); } }
     | '(' Expr ')'
 
 
@@ -258,7 +338,17 @@ Expr
                printf("IDENT (name=%s, address=%d)\n", s->name, s->addr);
                expr_type = s->type; 
            }
+           if (strcmp(s->type, "i32") == 0) {
+               CODEGEN("iload %d\n", s->addr);
+           } else if (strcmp(s->type, "f32") == 0) {
+               CODEGEN("fload %d\n", s->addr);
+           } else if (strcmp(s->type, "str") == 0) {
+               CODEGEN("aload %d\n", s->addr);
+           } else if (strcmp(s->type, "bool") == 0) {
+               CODEGEN("iload %d\n", s->addr);
+           }
          }
+
     | Literal   
 ;
 
@@ -268,9 +358,9 @@ Literal
     : INT_LIT { printf("INT_LIT "); expr_type = "i32"; } { CODEGEN("ldc %d\n", $<i_val>1); } 
     | FLOAT_LIT { printf("FLOAT_LIT "); expr_type = "f32"; } { CODEGEN("ldc %f\n", $<f_val>1); } 
     | '\"' STRING_LIT '\"' { printf("STRING_LIT "); expr_type = "str"; } { CODEGEN("ldc \"%s\"\n", $<s_val>2); } 
-    | '\"' '\"'{ printf("STRING_LIT "); expr_type = "str"; } { printf("\"\"\n"); }
-    | TRUE { printf("bool TRUE\n"); expr_type = "bool"; }
-    | FALSE { printf("bool FALSE\n"); expr_type = "bool"; }
+    | '\"' '\"'{ printf("STRING_LIT "); expr_type = "str"; } { CODEGEN("ldc \"\"\n"); }
+    | TRUE { printf("bool TRUE\n"); expr_type = "bool"; } { CODEGEN("iconst_1\n"); }
+    | FALSE { printf("bool FALSE\n"); expr_type = "bool"; } { CODEGEN("iconst_0\n"); }
 ;
 
 
@@ -370,4 +460,8 @@ static void dump_symbol(int sc_level) {
         Symbol* s = &symbol_tables[sc_level][i];
         printf("%-10d%-10s%-10d%-10s%-10d%-10d%-10s\n", i, s->name, s->mut, s->type, s->addr, s->lineno, s->func_sig);
     }
+}
+
+int new_label() {
+    return label_count++;
 }
